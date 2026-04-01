@@ -1,0 +1,32 @@
+# Fly.io — API FastAPI (projeto integrador Mercado Livre)
+# Deploy: na pasta backend → fly auth login && fly launch (primeira vez) && fly deploy
+# Nomes no Fly são únicos globalmente; se estiver ocupado, altere `app` (ex.: projeto-integrador-ml-api).
+
+app = "projeto-integrador-mercado-livre-api"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "prod"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

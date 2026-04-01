@@ -1,0 +1,229 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Marketplace Hub API",
+    "description": "FastAPI + Supabase Auth (Bearer) + OAuth Mercado Livre.\n\n1) Preencha `access_token` (JWT do Supabase).\n2) Chame **OAuth Meli → GET Authorize URL** (salva `meli_oauth_state`).\n3) Abra `meli_authorize_url` no navegador, faça login no Meli.\n4) Copie `code` da URL de redirect e cole em `meli_oauth_code`.\n5) **POST Callback** troca o code e grava tokens no Supabase.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8080" },
+    { "key": "access_token", "value": "" },
+    { "key": "meli_oauth_state", "value": "" },
+    { "key": "meli_authorize_url", "value": "" },
+    { "key": "meli_oauth_code", "value": "" },
+    { "key": "product_id", "value": "" },
+    { "key": "meli_listing_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/health"
+      }
+    },
+    {
+      "name": "OAuth Meli",
+      "item": [
+        {
+          "name": "GET Authorize URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const j = pm.response.json();",
+                  "  pm.collectionVariables.set('meli_oauth_state', j.state);",
+                  "  pm.collectionVariables.set('meli_authorize_url', j.authorize_url);",
+                  "  console.log('Abra no navegador:', j.authorize_url);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/oauth/meli/authorize"
+          }
+        },
+        {
+          "name": "POST Callback (troca code)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{meli_oauth_code}}\",\n  \"state\": \"{{meli_oauth_state}}\"\n}"
+            },
+            "url": "{{base_url}}/oauth/meli/callback"
+          }
+        },
+        {
+          "name": "GET Callback (redirect do Meli)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/oauth/meli/callback?code={{meli_oauth_code}}&state={{meli_oauth_state}}",
+              "host": ["{{base_url}}"],
+              "path": ["oauth", "meli", "callback"],
+              "query": [
+                { "key": "code", "value": "{{meli_oauth_code}}" },
+                { "key": "state", "value": "{{meli_oauth_state}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "POST Create product (SSOT)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Fone Bluetooth Teste MVP\",\n  \"description\": \"Descrição técnica do produto para testes.\",\n  \"price\": \"99.90\",\n  \"stock\": 10,\n  \"category_id\": \"MLB5672\",\n  \"images\": [\"https://httpbin.org/image/png\"],\n  \"status\": \"ready\"\n}"
+            },
+            "url": "{{base_url}}/products"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('product_id', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET List products",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/products"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Marketplace Meli",
+      "item": [
+        {
+          "name": "POST Publish",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\"\n}"
+            },
+            "url": "{{base_url}}/publish"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const j = pm.response.json();",
+                  "  if (j.external_listing_id) pm.collectionVariables.set('meli_listing_id', j.external_listing_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Sync (por product_id)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sync?product_id={{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["sync"],
+              "query": [{ "key": "product_id", "value": "{{product_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "GET Sync (por external_listing_id)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sync?external_listing_id={{meli_listing_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["sync"],
+              "query": [{ "key": "external_listing_id", "value": "{{meli_listing_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "PATCH Update (SSOT + listing)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_listing_id\": \"{{meli_listing_id}}\",\n  \"product_id\": \"{{product_id}}\"\n}"
+            },
+            "url": "{{base_url}}/update"
+          }
+        }
+      ]
+    }
+  ]
+}
